@@ -1,93 +1,104 @@
-# Product Requirements Document (PRD)
+# Product Requirements Document
 
-## LeetCode Friends Daily Tracker
+## LeetCode Friends Daily Tracker (LeetTrack)
 
 ### Product Goal
 
-Create a fun accountability tool for friends solving LeetCode problems
-daily.
+A fun, competitive accountability tool for friend groups solving LeetCode problems daily. Gamifies the grind with difficulty-weighted scoring, streaks, and monthly leaderboards.
 
 ### Target Users
 
--   Students
--   Competitive programmers
--   Friend coding groups
+- College students preparing for placements / internships
+- Competitive programmers in study groups
+- Friend coding circles doing daily DSA challenges
 
-### Features
+---
 
 ## Core Features
 
-### 1 User Management
+### 1. User Management
+- **Add participant** — enter any public LeetCode username
+- **Remove participant** — admin password required (prevents accidental/trolling deletions)
+- **Soft deletion** — removed users retain all historical data; re-adding restores them
 
--   Add username
--   Remove username
--   Admin control
+### 2. Daily Tracking
+- Fetches up to 15 recent accepted submissions from LeetCode's public GraphQL API
+- Groups submissions by UTC date, deduplicates by problem slug
+- Scores each problem: **Easy = 1 pt, Medium = 3 pts, Hard = 5 pts**
+- Status: **Completed** (≥ 3 unique problems) or **Pending** (< 3)
 
-### 2 Daily Tracking
+### 3. Daily Leaderboard
 
-System should: - Fetch submissions - Count accepted problems - Check
-daily target
+| # | Username | Solved | Score | Status | Streak | ✕ |
+|---|----------|--------|-------|--------|--------|---|
+| 🏆 | userA | 4 | 11 | ✅ Completed | 🔥 7d | 🗑️ |
+| 2 | userB | 1 | 3 | ⏳ Pending | 2d | 🗑️ |
 
-### 3 Leaderboard
+### 4. Monthly Leaderboard
+- Cumulative score aggregated across the entire calendar month
+- Visual bar chart per user
+- Breakdown: **Easy count, Medium count, Hard count**
+- Resets automatically on the 1st of each month
 
-Table:
+### 5. Streak System
+- Custom algorithm — does **not** use LeetCode's native streak
+- Requires "Completed" status (≥ 3 problems) to count a day
+- Counts consecutive UTC days backward from today
+- Resets at **Midnight UTC (5:30 AM IST)**
 
-  Username   Today   Status      Streak
-  ---------- ------- ----------- --------
-  UserA      3       Completed   5
-  UserB      1       Pending     2
+### 6. Manual Refresh
+- Single **Refresh Dashboard** button — no automatic polling or cron jobs
+- Fetches live data from LeetCode for all participants on demand
+- Displays loading spinner and "Last updated: HH:MM:SS" timestamp
+- Auto-triggers after adding a new participant
 
-### 4 Live Updates
+### 7. Theme & Design
+- **Neobrutalism** aesthetic: bold borders, hard shadows, boxy layouts
+- **Light / Dark mode** toggle, persisted in localStorage
+- **Space Grotesk** font from Google Fonts
+- **Lucide React** icons throughout
+- Mobile responsive (375px breakpoint)
 
--   Auto refresh
--   Last update timestamp
+---
 
-## Nice to Have
+## Security (MVP)
 
-### Gamification
+| Action | Protection |
+|--------|-----------|
+| View dashboard | Public — anyone with the link |
+| Add participant | Public — no password needed |
+| Remove participant | Admin password required |
+| Refresh data | Public — anyone can trigger |
 
--   Daily winner badge
--   Monthly leaderboard
--   Difficulty scoring
+No JWT, OAuth, sessions, or login systems. This is a private MVP dashboard.
 
-### Scoring Idea
+---
 
-    Easy = 1
-    Medium = 3
-    Hard = 5
+## Tech Stack
 
-### Future Features
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 19 + Vite · Apollo Client · Lucide Icons · Vanilla CSS |
+| Backend | Node.js + Express v4 · Apollo Server v4 (GraphQL) |
+| Database | Supabase (hosted PostgreSQL) |
+| Data Source | LeetCode public GraphQL API |
+| Deployment | Vercel (frontend) · Render (backend) |
+| Paid APIs | **None** |
 
--   Discord bot
--   WhatsApp alerts
--   GitHub heatmap
--   Public share link
+---
 
-## Technical Design
+## Future Ideas
 
-### Backend
+- 🤖 Discord / WhatsApp bot for daily notifications
+- 📊 GitHub-style heatmap visualization
+- 🔗 Shareable public profile links
+- 🏅 Achievement badges (first Hard solve, 30-day streak, etc.)
+- 📧 Weekly digest emails
 
--   Node.js or Python
--   GraphQL queries
--   Cron jobs
-
-### Frontend
-
--   React / Next.js
--   Simple table UI
-
-### Database
-
--   MongoDB or PostgreSQL
-
-## Metrics
-
-Success measured by: - Daily usage - Streak retention - Friend
-participation
+---
 
 ## MVP Scope
 
-Must include: - Username input - Daily count - Leaderboard - Auto
-refresh
+**Included:** Daily leaderboard, monthly view, scoring, streaks, manual refresh, admin delete, light/dark theme, mobile responsive.
 
-Exclude: - Authentication - Payments - Social features
+**Excluded:** Authentication, payments, social features, notifications, real-time WebSockets.
