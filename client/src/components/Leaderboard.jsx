@@ -1,8 +1,7 @@
-import { useQuery, useSubscription, gql } from '@apollo/client';
+import { useQuery, useMutation, gql } from '@apollo/client';
 import { useState } from 'react';
-import { LayoutDashboard, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, AlertCircle, RefreshCw } from 'lucide-react';
 import ParticipantRow from './ParticipantRow';
-import LiveIndicator from './LiveIndicator';
 
 const GET_LEADERBOARD = gql`
   query GetLeaderboard {
@@ -17,9 +16,9 @@ const GET_LEADERBOARD = gql`
   }
 `;
 
-const LEADERBOARD_SUB = gql`
-  subscription {
-    leaderboardUpdated {
+const REFRESH_DASHBOARD = gql`
+  mutation RefreshDashboard {
+    refreshDashboard {
       username
       solvedToday
       score
@@ -43,25 +42,32 @@ function SkeletonRow() {
 }
 
 export default function Leaderboard() {
-  const { data, loading, error, refetch } = useQuery(GET_LEADERBOARD, {
-    pollInterval: 5 * 60 * 1000, // fallback poll every 5 min
-  });
+  const { data, loading, error, refetch } = useQuery(GET_LEADERBOARD);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState(null);
 
-  const [isLive, setIsLive] = useState(false);
-  const [liveData, setLiveData] = useState(null);
-
-  useSubscription(LEADERBOARD_SUB, {
-    onData: ({ data: { data } }) => {
-      if (data?.leaderboardUpdated) {
-        setLiveData(data.leaderboardUpdated);
-        setIsLive(true);
-      }
+  const [refreshDashboard] = useMutation(REFRESH_DASHBOARD, {
+    onCompleted: () => {
+      setLastRefreshed(new Date());
+      setRefreshing(false);
+      refetch();
     },
-    onError: () => setIsLive(false),
+    onError: () => setRefreshing(false),
   });
 
-  const leaderboard = liveData ?? data?.leaderboard ?? [];
+  const handleRefresh = () => {
+    setRefreshing(true);
+    refreshDashboard();
+  };
+
+  const leaderboard = data?.leaderboard ?? [];
   const lastUpdated = leaderboard[0]?.updatedAt ?? null;
+
+  const formatTime = (dateStr) => {
+    if (!dateStr) return 'Never';
+    const d = new Date(dateStr);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
 
   return (
     <div>
@@ -69,7 +75,21 @@ export default function Leaderboard() {
         <h2 className="section-title" style={{ marginBottom: 0 }}>
           <LayoutDashboard size={18} /> Today's Leaderboard
         </h2>
-        <LiveIndicator lastUpdated={lastUpdated} isLive={isLive} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+            Last updated: {lastRefreshed ? formatTime(lastRefreshed.toISOString()) : formatTime(lastUpdated)}
+          </span>
+          <button
+            className="btn btn-primary"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            id="refresh-dashboard-btn"
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <RefreshCw size={15} className={refreshing ? 'spin' : ''} />
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
       {error && (

@@ -31,10 +31,7 @@ export const typeDefs = `#graphql
 
   type Mutation {
     addParticipant(username: String!): Participant!
-    removeParticipant(username: String!): Boolean!
-  }
-
-  type Subscription {
-    leaderboardUpdated: [LeaderboardEntry!]!
+    removeParticipant(username: String!, password: String!): Boolean!
+    refreshDashboard: [LeaderboardEntry!]!
   }
 `;

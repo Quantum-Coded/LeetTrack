@@ -11,6 +11,19 @@ const ADD_PARTICIPANT = gql`
   }
 `;
 
+const REFRESH_DASHBOARD = gql`
+  mutation RefreshDashboard {
+    refreshDashboard {
+      username
+      solvedToday
+      score
+      status
+      streak
+      updatedAt
+    }
+  }
+`;
+
 const GET_LEADERBOARD = gql`
   query { leaderboard { username solvedToday score status streak updatedAt } }
 `;
@@ -18,11 +31,25 @@ const GET_LEADERBOARD = gql`
 export default function AddParticipant() {
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
+  const [adding, setAdding] = useState(false);
 
-  const [addParticipant, { loading }] = useMutation(ADD_PARTICIPANT, {
+  const [refreshDashboard] = useMutation(REFRESH_DASHBOARD, {
     refetchQueries: [{ query: GET_LEADERBOARD }],
-    onCompleted: () => { setUsername(''); setError(''); },
-    onError: (err) => setError(err.message),
+    onCompleted: () => setAdding(false),
+    onError: () => setAdding(false),
+  });
+
+  const [addParticipant] = useMutation(ADD_PARTICIPANT, {
+    onCompleted: () => {
+      setUsername('');
+      setError('');
+      // Auto-trigger a full refresh so the new user's stats load immediately
+      refreshDashboard();
+    },
+    onError: (err) => {
+      setError(err.message);
+      setAdding(false);
+    },
   });
 
   const handleSubmit = (e) => {
@@ -30,6 +57,7 @@ export default function AddParticipant() {
     const trimmed = username.trim();
     if (!trimmed) { setError('Please enter a LeetCode username.'); return; }
     setError('');
+    setAdding(true);
     addParticipant({ variables: { username: trimmed } });
   };
 
@@ -52,7 +80,7 @@ export default function AddParticipant() {
             placeholder="Enter LeetCode username…"
             value={username}
             onChange={e => setUsername(e.target.value)}
-            disabled={loading}
+            disabled={adding}
             id="add-username-input"
             autoComplete="off"
           />
@@ -60,10 +88,10 @@ export default function AddParticipant() {
         <button
           className="btn btn-primary"
           type="submit"
-          disabled={loading}
+          disabled={adding}
           id="add-participant-btn"
         >
-          {loading ? (
+          {adding ? (
             <span style={{ opacity: 0.7 }}>Adding…</span>
           ) : (
             <><Plus size={16} /> <span className="label">Add</span></>
