@@ -4,6 +4,7 @@ import {
   removeParticipant,
   getLeaderboard,
   getMonthlyLeaderboard,
+  getKnownSlugs,
 } from '../services/trackerService.js';
 
 import { fetchUserStats } from '../services/leetcodeService.js';
@@ -27,7 +28,8 @@ export const resolvers = {
 
       // Instantly fetch their initial stats
       try {
-        const stats = await fetchUserStats(participant.username);
+        const knownSlugs = await getKnownSlugs(participant.username);
+        const stats = await fetchUserStats(participant.username, knownSlugs);
         if (stats) {
           await upsertDailyRecords(participant.username, stats);
         }
