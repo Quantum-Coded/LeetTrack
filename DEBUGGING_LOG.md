@@ -35,6 +35,29 @@ This document tracks the core issues resolved, the methodologies applied to fix 
 - **Private Profiles (e.g. `rishil0706` displaying 0 points):** Discovered that if a user manually switches off "Show My Recent Submissions" in their LeetCode Privacy settings, LeetCode's GraphQL API actively blocks the backend tracker by returning `[]`. This is not a bug with the system, but correct behavioral enforcement of LeetCode's security rules.
 - **Timezone Drift (UTC vs IST):** Investigated discrepancies where midnight submitted problems in India (IST) were not appearing for "Today". Diagnosed that LeetCode universally resets its daily counters at 5:30 AM IST (Midnight UTC). The tracker accurately mirrors this specific UTC cutoff, correctly shifting late-night submissions into "Yesterday".
 
+## 7. Issue: Additive Merge Caused Recurring Score Inflation (ROOT CAUSE OF ALL ABOVE)
+**Symptoms:** After every debugging session and fix, scores would eventually re-inflate. Problems #2 and #4 above kept recurring despite the `solved_slugs` dedup table and `fix.js` rebuild scripts.
+**Root Cause:**
+- `upsertDailyRecords` in `trackerService.js` used **additive merge** (`existing + new`) instead of **idempotent merge** (`Math.max(existing, new)`).
+- Even with `knownSlugs` filtering out already-seen problems, several edge cases bypassed it: first refresh after adding a user (empty `knownSlugs`), race conditions between slug saves, and rebuild scripts wiping `solved_slugs` but not `daily_records`.
+- The additive logic meant: refresh once → correct score. Refresh twice → doubled score. Every single refresh compounded the inflation.
+**Solution:** Replaced all additive merge operations with `Math.max()` comparisons. This makes the entire pipeline **idempotent** — refreshing 100 times produces the exact same result as refreshing once. The `knownSlugs` dedup still acts as a first-line optimization, and `Math.max()` acts as a bulletproof safety net.
+
+## 8. Issue: Today's Leaderboard Used Inconsistent Date Format
+**Symptoms:** Users occasionally showing 0 solved/0 score on the daily leaderboard even when they had solved problems, especially when server timezone differed from UTC.
+**Root Cause:** `getLeaderboard()` used `new Date().toISOString().slice(0, 10)` while `leetcodeService.js` constructed dates manually with `getUTCFullYear()/getUTCMonth()/getUTCDate()`. These produce the same result most of the time, but the inconsistency was fragile.
+**Solution:** Standardized `getLeaderboard()` to use the same explicit UTC date construction pattern as `leetcodeService.js`.
+
+## 9. Issue: Streak Calculation Re-evaluated Status from Inflated Scores
+**Symptoms:** Artificially extended streaks — days where a user should have been "Pending" were counted as "Completed" because the inflated DB score exceeded the 3-point threshold.
+**Root Cause:** `getStreak()` re-derived status from `record.score >= 3` instead of trusting the stored `status` column. With inflated scores from Bug #7, this over-counted completed days.
+**Solution:** Simplified `getStreak()` to directly use the stored `record.status` column, which is computed correctly at write time.
+
+## 10. Issue: Monthly Leaderboard Hid Zero-Score Participants
+**Symptoms:** Users added to the tracker but who hadn't solved anything (or whose data was wiped by `fix.js`) disappeared entirely from the monthly leaderboard.
+**Root Cause:** `getMonthlyLeaderboard()` only iterated over database rows, so users with no `daily_records` rows were never included in the output.
+**Solution:** Pre-initialize all active participants with `{ score: 0, easy: 0, medium: 0, hard: 0 }` before aggregating database rows.
+
 ---
 
 ## Files Added & Modified

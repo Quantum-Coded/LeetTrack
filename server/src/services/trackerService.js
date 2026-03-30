@@ -103,15 +103,16 @@ export async function upsertDailyRecords(username, records) {
       .eq('date', date)
       .maybeSingle();
 
-    // ── Merge logic: NEVER downgrade any field ──
-    // The new values from LeetCode API are ADDITIVE to existing DB values.
-    // On each refresh, leetcodeService only returns NEW unique slugs (not
-    // previously tracked ones), so we ADD counts/scores to existing values.
-    const mergedSolvedToday = (existing?.solved_today || 0) + solvedToday;
-    const mergedScore = (existing?.score || 0) + score;
-    const mergedEasy = (existing?.easy_count || 0) + (easyCount || 0);
-    const mergedMedium = (existing?.medium_count || 0) + (mediumCount || 0);
-    const mergedHard = (existing?.hard_count || 0) + (hardCount || 0);
+    // ── Merge logic: IDEMPOTENT MAX — never inflate, never downgrade ──
+    // We take the MAX of existing vs incoming values. This makes the pipeline
+    // fully idempotent: refreshing 100 times produces the same result.
+    // leetcodeService computes full per-day stats from raw LeetCode data,
+    // so the incoming values already represent the complete day's totals.
+    const mergedSolvedToday = Math.max(existing?.solved_today || 0, solvedToday);
+    const mergedScore = Math.max(existing?.score || 0, score);
+    const mergedEasy = Math.max(existing?.easy_count || 0, easyCount || 0);
+    const mergedMedium = Math.max(existing?.medium_count || 0, mediumCount || 0);
+    const mergedHard = Math.max(existing?.hard_count || 0, hardCount || 0);
     
     // Status: 'Completed' if cumulative score >= 3, or if already completed
     const mergedStatus = (mergedScore >= 3 || existing?.status === 'Completed')
@@ -164,8 +165,8 @@ export async function getStreak(username, currentStatus, today) {
   // Build a lookup map for O(1) access instead of iterating linearly
   const dateStatusMap = new Map();
   for (const record of data) {
-    const actStatus = (record.score >= 3 || record.status === 'Completed') ? 'Completed' : 'Pending';
-    dateStatusMap.set(record.date, actStatus);
+    // Trust the stored status column — it was computed correctly at write time
+    dateStatusMap.set(record.date, record.status);
   }
 
   for (let i = 0; i < 90; i++) {
@@ -184,7 +185,9 @@ export async function getStreak(username, currentStatus, today) {
 }
 
 export async function getLeaderboard() {
-  const today = new Date().toISOString().slice(0, 10);
+  // Use explicit UTC date construction to match leetcodeService's date format
+  const now = new Date();
+  const today = [now.getUTCFullYear(), String(now.getUTCMonth() + 1).padStart(2, '0'), String(now.getUTCDate()).padStart(2, '0')].join('-');
 
   // Get all active participants
   const participants = await getAllParticipants();
@@ -206,7 +209,8 @@ export async function getLeaderboard() {
   const leaderboard = participants.map(p => {
     const record = recordMap.get(p.username);
     const scoreVal = record?.score ?? 0;
-    const computedStatus = (scoreVal >= 3 || record?.status === 'Completed') ? 'Completed' : (record?.status ?? 'Pending');
+    // Trust the stored status column; fall back to score-based check only for display
+    const computedStatus = record?.status === 'Completed' ? 'Completed' : (scoreVal >= 3 ? 'Completed' : 'Pending');
 
     return {
       username: p.username,
@@ -244,7 +248,11 @@ export async function getMonthlyLeaderboard() {
 
   if (error) throw error;
 
+  // Initialize all active participants (even those with 0 scores)
   const totals = {};
+  for (const u of usernames) {
+    totals[u] = { score: 0, easy: 0, medium: 0, hard: 0 };
+  }
   for (const row of data || []) {
     if (!totals[row.username]) {
       totals[row.username] = { score: 0, easy: 0, medium: 0, hard: 0 };
