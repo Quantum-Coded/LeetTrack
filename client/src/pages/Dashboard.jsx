@@ -7,7 +7,7 @@ export default function Dashboard() {
     <div>
       <h1 className="page-title">Friends Dashboard</h1>
       <p className="page-subtitle">
-        Track your squad's daily LeetCode grind. ≥ 3 problems = ✅ Completed.
+        Track your squad's daily LeetCode grind. ≥ 3 points = ✅ Completed.
       </p>
 
       <div className="card" style={{ marginBottom: 24 }}>

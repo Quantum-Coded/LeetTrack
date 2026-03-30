@@ -157,7 +157,7 @@ export async function fetchUserStats(username, knownSlugs = new Set()) {
       easyCount,
       mediumCount,
       hardCount,
-      status: probsMap.size >= 3 ? 'Completed' : 'Pending',
+      status: score >= 3 ? 'Completed' : 'Pending',
       newSlugs, // pass slugs so tracker can persist them
     });
   }

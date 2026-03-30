@@ -113,8 +113,8 @@ export async function upsertDailyRecords(username, records) {
     const mergedMedium = (existing?.medium_count || 0) + (mediumCount || 0);
     const mergedHard = (existing?.hard_count || 0) + (hardCount || 0);
     
-    // Status: 'Completed' if cumulative solved >= 3, or if already completed
-    const mergedStatus = (mergedSolvedToday >= 3 || existing?.status === 'Completed')
+    // Status: 'Completed' if cumulative score >= 3, or if already completed
+    const mergedStatus = (mergedScore >= 3 || existing?.status === 'Completed')
       ? 'Completed'
       : (status === 'Completed' ? 'Completed' : 'Pending');
 
