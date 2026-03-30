@@ -55,7 +55,7 @@ async function getProblemDifficulty(titleSlug) {
  * 3. We still build records for past dates so streak calculation has history,
  *    but any slug that exists in `knownSlugs` is excluded from counts.
  */
-export async function fetchUserStats(username, knownSlugs = new Set()) {
+export async function fetchUserStats(username, knownSlugs = new Set(), limitOverride = 50) {
   let submissions = [];
   try {
     const data = await gqlFetch(
@@ -65,7 +65,7 @@ export async function fetchUserStats(username, knownSlugs = new Set()) {
           timestamp
         }
       }`,
-      { username, limit: 50 }
+      { username, limit: limitOverride }
     );
     submissions = data?.recentAcSubmissionList || [];
   } catch (err) {
