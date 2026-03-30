@@ -148,7 +148,7 @@ export async function getStreak(username, currentStatus, today) {
   // Fetch last 90 days of records, sorted descending
   const { data, error } = await supabase
     .from('daily_records')
-    .select('date, status')
+    .select('date, status, score')
     .eq('username', username.trim().toLowerCase())
     .lt('date', today)
     .order('date', { ascending: false })
@@ -164,7 +164,8 @@ export async function getStreak(username, currentStatus, today) {
   // Build a lookup map for O(1) access instead of iterating linearly
   const dateStatusMap = new Map();
   for (const record of data) {
-    dateStatusMap.set(record.date, record.status);
+    const actStatus = (record.score >= 3 || record.status === 'Completed') ? 'Completed' : 'Pending';
+    dateStatusMap.set(record.date, actStatus);
   }
 
   for (let i = 0; i < 90; i++) {
@@ -204,11 +205,14 @@ export async function getLeaderboard() {
 
   const leaderboard = participants.map(p => {
     const record = recordMap.get(p.username);
+    const scoreVal = record?.score ?? 0;
+    const computedStatus = (scoreVal >= 3 || record?.status === 'Completed') ? 'Completed' : (record?.status ?? 'Pending');
+
     return {
       username: p.username,
       solvedToday: record?.solved_today ?? 0,
-      score: record?.score ?? 0,
-      status: record?.status ?? 'Pending',
+      score: scoreVal,
+      status: computedStatus,
       streak: record?.streak ?? 0,
       updatedAt: record?.updated_at ?? null,
     };
